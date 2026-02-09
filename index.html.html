@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電商商品圖自動合併工具 (終極版)</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-color: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            color: var(--text-color);
+        }
+
+        /* 控制面板區域 */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #e2e8f0;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        select, input[type="number"], input[type="color"] {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        button.secondary {
+            background-color: #64748b;
+        }
+
+        button.secondary:hover {
+            background-color: #475569;
+        }
+
+        button:disabled {
+            background-color: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        /* 上傳區塊 */
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary-color);
+            background-color: #eff6ff;
+        }
+
+        .drop-zone p {
+            margin: 0;
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+
+        /* 縮圖排序區 */
+        .sortable-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            justify-content: center;
+            min-height: 50px;
+            padding: 10px;
+            /* border: 1px solid #eee; */
+        }
+
+        .sortable-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: grab;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+            background: #eee;
+        }
+
+        .sortable-item:active {
+            cursor: grabbing;
+        }
+
+        .sortable-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+
+        .sortable-item.dragging {
+            opacity: 0.5;
+            border-color: var(--primary-color);
+        }
+
+        .sortable-item .remove-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .sortable-item .remove-btn:hover {
+            background: #ef4444;
+        }
+
+        /* 預覽與畫布 */
+        .preview-area {
+            width: 100%;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-image: conic-gradient(#eee 25%, white 0 25%, white 50%, #eee 0 50%, #eee 75%, white 0 75%, white 100%);
+            background-size: 20px 20px;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 300px;
+            align-items: center;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+        
+        /* 輸出格式選擇樣式特別標註 */
+        .download-group {
+            display: flex;
+            gap: 5px;
+            border-left: 2px solid #cbd5e1;
+            padding-left: 15px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>電商商品圖自動合併工具</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="layoutMode">排列：</label>
+            <select id="layoutMode">
+                <option value="horizontal">橫向 (高度對齊)</option>
+                <option value="vertical">縱向 (寬度對齊)</option>
+                <option value="grid" selected>網格 (N x M)</option>
+            </select>
+        </div>
+
+        <div class="control-group" id="gridColsGroup">
+            <label for="gridCols">每列：</label>
+            <input type="number" id="gridCols" value="3" min="1" max="10" style="width: 50px;">
+            
+            <label class="checkbox-group" title="若圖片數除不盡，將少的那一排置於頂部">
+                <input type="checkbox" id="incompleteTop">
+                <span>倒金字塔</span>
+            </label>
+        </div>
+
+        <div class="control-group">
+            <label for="gapSize">間距：</label>
+            <input type="number" id="gapSize" value="10" min="0" style="width: 50px;">
+        </div>
+
+        <div class="control-group">
+            <label for="bgColor">底色：</label>
+            <input type="color" id="bgColor" value="#ffffff">
+        </div>
+        
+        <div class="control-group download-group">
+            <select id="outputFormat" title="選擇輸出格式">
+                <option value="image/jpeg">JPG (預設)</option>
+                <option value="image/png">PNG (無損)</option>
+                <option value="image/webp">WebP (輕量)</option>
+            </select>
+            <button id="downloadBtn" disabled>下載圖片</button>
+        </div>
+        
+        <button id="clearBtn" class="secondary">清空</button>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+        <p>點擊或拖曳上傳圖片 (支援多選)</p>
+        <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+    </div>
+
+    <div class="sortable-list" id="sortableList"></div>
+
+    <div class="preview-area">
+        <canvas id="canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const layoutMode = document.getElementById('layoutMode');
+    const gridColsInput = document.getElementById('gridCols');
+    const gridColsGroup = document.getElementById('gridColsGroup');
+    const incompleteTopInput = document.getElementById('incompleteTop');
+    const gapSizeInput = document.getElementById('gapSize');
+    const bgColorInput = document.getElementById('bgColor');
+    const outputFormatInput = document.getElementById('outputFormat'); // 新增
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const sortableList = document.getElementById('sortableList');
+
+    let loadedItems = []; 
+
+    // --- 事件監聽 ---
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFiles);
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files);
+    });
+
+    layoutMode.addEventListener('change', () => {
+        if (layoutMode.value === 'grid') gridColsGroup.classList.remove('hidden');
+        else gridColsGroup.classList.add('hidden');
+        renderCanvas();
+    });
+    
+    // 所有輸入變更都重繪
+    [gridColsInput, gapSizeInput, bgColorInput, incompleteTopInput].forEach(input => {
+        input.addEventListener('input', renderCanvas);
+        input.addEventListener('change', renderCanvas);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        loadedItems = [];
+        updateSortableList();
+        renderCanvas();
+        fileInput.value = '';
+    });
+
+    // --- 下載邏輯更新 ---
+    downloadBtn.addEventListener('click', () => {
+        if (canvas.width === 0) return;
+        
+        const format = outputFormatInput.value;
+        let ext = 'jpg';
+        if (format === 'image/png') ext = 'png';
+        if (format === 'image/webp') ext = 'webp';
+
+        const link = document.createElement('a');
+        link.download = `merged-${Date.now()}.${ext}`;
+        // JPG 品質設為 0.95，PNG 忽略此參數
+        link.href = canvas.toDataURL(format, 0.95);
+        link.click();
+    });
+
+    // --- 檔案處理邏輯 ---
+    function handleFiles(e) { processFiles(e.target.files); }
+
+    async function processFiles(files) {
+        const fileArray = Array.from(files);
+        const promises = fileArray.map(file => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        try {
+            const newImages = await Promise.all(promises);
+            const newItems = newImages.map(img => ({
+                id: Math.random().toString(36).substr(2, 9),
+                img: img
+            }));
+            loadedItems = loadedItems.concat(newItems);
+            updateSortableList();
+            renderCanvas();
+        } catch (err) {
+            console.error(err);
+            alert('讀取錯誤');
+        }
+    }
+
+    // --- 縮圖排序邏輯 ---
+    function updateSortableList() {
+        sortableList.innerHTML = '';
+        if (loadedItems.length === 0) {
+            downloadBtn.disabled = true;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 0; canvas.height = 0;
+            return;
+        }
+        downloadBtn.disabled = false;
+
+        loadedItems.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'sortable-item';
+            div.draggable = true;
+            div.dataset.index = index;
+
+            const thumb = item.img.cloneNode();
+            div.appendChild(thumb);
+
+            const removeBtn = document.createElement('span');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                loadedItems.splice(index, 1);
+                updateSortableList();
+                renderCanvas();
+            };
+            div.appendChild(removeBtn);
+
+            div.addEventListener('dragstart', () => {
+                div.classList.add('dragging');
+            });
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+                reorderItems();
+            });
+            
+            sortableList.appendChild(div);
+        });
+    }
+
+    function reorderItems() {
+        const newOrder = [];
+        const items = sortableList.querySelectorAll('.sortable-item');
+        items.forEach(div => {
+            const oldIndex = parseInt(div.dataset.index);
+            // 由於 DOM 順序已變，我們依據 dataset.index 找回原本的 item 參照
+            // 但因為 items 是依序選取，所以只要確保順序正確即可
+            // 這裡必須從 loadedItems 中根據 oldIndex 提取
+            // 但如果使用者操作多次，oldIndex 可能會混亂，所以需要一個更穩健的方式
+            // 修正：其實只要依據當前 DOM 順序重組即可
+            // 但因為我們沒有存 map，最簡單是每次 render sortable list 時更新 dataset.index
+        });
+        
+        // 修正後的拖曳處理
+        // 在 dragend 觸發時，sortableList 內的 DOM 已經被瀏覽器排好序了
+        // 我們只需要根據 DOM 的順序，重新建立 loadedItems
+        const currentDivs = Array.from(sortableList.children);
+        const reorderedLoadedItems = currentDivs.map(div => {
+            const oldIndex = parseInt(div.dataset.index);
+            return loadedItems[oldIndex]; 
+            // 注意：這裡有個潛在 Bug，如果直接用 index 對應，
+            // 必須保證 loadedItems 在 dragstart 之前是沒有變動的。
+            // 為了安全，我們依賴 dataset.index 指向 "原本陣列的位置"
+            // 但因為 DOM 已經變了，我們建立新陣列即可。
+        });
+        
+        loadedItems = reorderedLoadedItems;
+        // 重新繪製列表以重置 index (雖然有點浪費效能但最安全)
+        updateSortableList(); 
+        renderCanvas();
+    }
+
+    sortableList.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingItem = document.querySelector('.dragging');
+        if (!draggingItem) return;
+        const siblings = [...sortableList.querySelectorAll('.sortable-item:not(.dragging)')];
+        const nextSibling = siblings.find(sibling => {
+            return e.clientX <= sibling.getBoundingClientRect().left + sibling.getBoundingClientRect().width / 2;
+        });
+        sortableList.insertBefore(draggingItem, nextSibling);
+    });
+
+    // --- 繪圖核心邏輯 ---
+    function renderCanvas() {
+        if (loadedItems.length === 0) return;
+
+        const mode = layoutMode.value;
+        const gap = parseInt(gapSizeInput.value) || 0;
+        const bgColor = bgColorInput.value;
+        const drawData = [];
+
+        let canvasWidth = 0;
+        let canvasHeight = 0;
+        
+        const images = loadedItems.map(item => item.img);
+
+        if (mode === 'horizontal') {
+            const maxHeight = Math.max(...images.map(img => img.height));
+            let currentX = gap;
+            images.forEach(img => {
+                const scale = maxHeight / img.height;
+                const w = img.width * scale;
+                const h = maxHeight;
+                drawData.push({ img, x: currentX, y: gap, w, h });
+                currentX += w + gap;
+            });
+            canvasHeight = maxHeight + (gap * 2);
+            canvasWidth = currentX;
+
+        } else if (mode === 'vertical') {
+            const maxWidth = Math.max(...images.map(img => img.width));
+            let currentY = gap;
+            images.forEach(img => {
+                const scale = maxWidth / img.width;
+                const w = maxWidth;
+                const h = img.height * scale;
+                drawData.push({ img, x: gap, y: currentY, w, h });
+                currentY += h + gap;
+            });
+            canvasWidth = maxWidth + (gap * 2);
+            canvasHeight = currentY;
+
+        } else if (mode === 'grid') {
+            const cols = parseInt(gridColsInput.value) || 2;
+            const maxImgWidth = Math.max(...images.map(img => img.width));
+            const colWidth = maxImgWidth; 
+            canvasWidth = (colWidth * cols) + (gap * (cols + 1));
+            
+            let currentY = gap;
+            let currentImgIndex = 0;
+            const totalImages = images.length;
+            
+            let firstRowParams = { count: cols, isSpecial: false };
+            const remainder = totalImages % cols;
+            if (incompleteTopInput.checked && remainder > 0) {
+                firstRowParams.count = remainder;
+                firstRowParams.isSpecial = true;
+            }
+
+            while (currentImgIndex < totalImages) {
+                let countInThisRow = cols;
+                if (currentImgIndex === 0 && firstRowParams.isSpecial) {
+                    countInThisRow = firstRowParams.count;
+                }
+
+                const rowImages = images.slice(currentImgIndex, currentImgIndex + countInThisRow);
+                const emptySlots = cols - rowImages.length;
+                let rowOffsetX = 0;
+                
+                // 只有在非特殊的第一排(也就是正常的最後一排)才需要計算這個
+                // 其實無論哪一排，只要缺圖就置中，這是通用的美感
+                if (emptySlots > 0) {
+                    rowOffsetX = (emptySlots * (colWidth + gap)) / 2;
+                }
+
+                const rowImgDimensions = rowImages.map(img => {
+                    const scale = colWidth / img.width;
+                    return { w: colWidth, h: img.height * scale, img: img };
+                });
+
+                const maxRowHeight = Math.max(...rowImgDimensions.map(d => d.h));
+
+                rowImgDimensions.forEach((d, idx) => {
+                    const x = gap + (idx * (colWidth + gap)) + rowOffsetX;
+                    const y = currentY; 
+                    drawData.push({ img: d.img, x, y, w: d.w, h: d.h });
+                });
+
+                currentY += maxRowHeight + gap;
+                currentImgIndex += countInThisRow;
+            }
+            canvasHeight = currentY;
+        }
+
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        drawData.forEach(d => {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(d.img, d.x, d.y, d.w, d.h);
+        });
+    }
+</script>
+
+</body>
+</html>
